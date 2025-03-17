@@ -2,6 +2,7 @@
 #ifndef GEOTIFFUTIL_H
 #define GEOTIFFUTIL_H
 #define DIMGT 6
+#include<vector>
 
 using namespace std; 
 
@@ -24,6 +25,8 @@ typedef struct {
 	float refl_mul;
 	float refl_add;
 	float sun_elev;
+	float k1_constant;
+	float k2_constant;
 } GeotiffMeta;
 
 
@@ -37,12 +40,12 @@ int geotiffWrite(uint16_t**, uint16_t**, uint16_t**, uint16_t**, Geotiff, string
 
 int writeGeotiff(
 	Geotiff,
-	float**,
-	float**,
-	float**,
-	float**,
-	string&);
+	vector<float**>,
+	string&,
+	string task);
 
-int TOA_reflectance(const char*[], string&, string&);
+int cvtToTOAreflectance(const char*[], string&, string&);
+int cvtToRadiance(const char* [], string&, string&);
+int cvtToTOABT(const char* [], string&, string&);
 
 #endif

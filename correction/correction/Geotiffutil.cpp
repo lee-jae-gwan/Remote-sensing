@@ -6,6 +6,8 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <cmath>
+#include <vector>
 
 using namespace std;
 
@@ -115,9 +117,9 @@ void readDimensionsGeotiff(
 
 GeotiffMeta readGeoTiffMeta(string& filename, int band) {
     ifstream file(filename);
-    
+
     string band_num = to_string(band);
-    
+
     string line;
     GeotiffMeta metaobj;
 
@@ -126,253 +128,221 @@ GeotiffMeta readGeoTiffMeta(string& filename, int band) {
     string REFL_MUL_key = "REFLECTANCE_MULT_BAND_" + band_num;
     string REFL_ADD_key = "REFLECTANCE_ADD_BAND_" + band_num;
     string SUN_ELEV_key = "SUN_ELEVATION";
+    string K1_CONSTANT_key = "K1_CONSTANT_BAND_" + band_num;
+    string K2_CONSTANT_key = "K2_CONSTANT_BAND_" + band_num;
 
-    float RADI_MUL;
-    float RADI_ADD;
-    float REFL_MUL;
-    float REFL_ADD;
-    float SUN_ELEV;
+    float RADI_MUL =NULL;
+    float RADI_ADD = NULL;
+    float REFL_MUL = NULL;
+    float REFL_ADD = NULL;
+    float SUN_ELEV = NULL;
+    float K1_CONSTANT = NULL;
+    float K2_CONSTANT = NULL;
 
-    while (getline(file, line)) {
-        // 따옴표 제거
-        line.erase(std::remove(line.begin(), line.end(), '"'), line.end());
-        // 각 키에 맞는 값 찾기
-        if (line.find(RADI_MUL_key) != std::string::npos) {
-            cout << "----------------------------------" << endl;
-            size_t pos = line.find(":");
-            if (pos != std::string::npos) {
-                RADI_MUL = std::stof(line.substr(pos + 1));
+    if (band < 10) {
+        while (getline(file, line)) {
+            // 따옴표 제거
+            line.erase(std::remove(line.begin(), line.end(), '"'), line.end());
+            // 각 키에 맞는 값 찾기
+            if (line.find(RADI_MUL_key) != std::string::npos) {
+                cout << "----------------------------------" << endl;
+                size_t pos = line.find(":");
+                if (pos != std::string::npos) {
+                    RADI_MUL = std::stof(line.substr(pos + 1));
+                }
+            }
+            else if (line.find(RADI_ADD_key) != std::string::npos) {
+                size_t pos = line.find(":");
+                if (pos != std::string::npos) {
+                    RADI_ADD = std::stof(line.substr(pos + 1));
+                }
+            }
+            else if (line.find(REFL_MUL_key) != std::string::npos) {
+                size_t pos = line.find(":");
+                if (pos != std::string::npos) {
+                    REFL_MUL = std::stof(line.substr(pos + 1));
+                }
+            }
+            else if (line.find(REFL_ADD_key) != std::string::npos) {
+                size_t pos = line.find(":");
+                if (pos != std::string::npos) {
+                    REFL_ADD = std::stof(line.substr(pos + 1));
+                }
+            }
+            else if (line.find(SUN_ELEV_key) != std::string::npos) {
+                size_t pos = line.find(":");
+                if (pos != std::string::npos) {
+                    SUN_ELEV = std::stof(line.substr(pos + 1));
+                }
             }
         }
-        else if (line.find(RADI_ADD_key) != std::string::npos) {
-            size_t pos = line.find(":");
-            if (pos != std::string::npos) {
-                RADI_ADD = std::stof(line.substr(pos + 1));
+    }
+    else if (band == 10 || band == 11) {
+        while (getline(file, line)) {
+            // 따옴표 제거
+            line.erase(std::remove(line.begin(), line.end(), '"'), line.end());
+            // 각 키에 맞는 값 찾기
+            if (line.find(RADI_MUL_key) != std::string::npos) {
+                cout << "----------------------------------" << endl;
+                size_t pos = line.find(":");
+                if (pos != std::string::npos) {
+                    RADI_MUL = std::stof(line.substr(pos + 1));
+                }
             }
-        }
-        else if (line.find(REFL_MUL_key) != std::string::npos) {
-            size_t pos = line.find(":");
-            if (pos != std::string::npos) {
-                REFL_MUL = std::stof(line.substr(pos + 1));
+            else if (line.find(RADI_ADD_key) != std::string::npos) {
+                size_t pos = line.find(":");
+                if (pos != std::string::npos) {
+                    RADI_ADD = std::stof(line.substr(pos + 1));
+                }
             }
-        }
-        else if (line.find(REFL_ADD_key) != std::string::npos) {
-            size_t pos = line.find(":");
-            if (pos != std::string::npos) {
-                REFL_ADD = std::stof(line.substr(pos + 1));
+            else if (line.find(K1_CONSTANT_key) != std::string::npos) {
+                size_t pos = line.find(":");
+                if (pos != std::string::npos) {
+                    K1_CONSTANT = std::stof(line.substr(pos + 1));
+                }
             }
-        }
-        else if (line.find(SUN_ELEV_key) != std::string::npos) {
-            size_t pos = line.find(":");
-            if (pos != std::string::npos) {
-                SUN_ELEV = std::stof(line.substr(pos + 1));
+            else if (line.find(K2_CONSTANT_key) != std::string::npos) {
+                size_t pos = line.find(":");
+                if (pos != std::string::npos) {
+                    K2_CONSTANT = std::stof(line.substr(pos + 1));
+                }
             }
         }
     }
 
+
     const char* fname = filename.c_str();
-    metaobj.filename = fname;
-    metaobj.radi_mul = RADI_MUL;
-    metaobj.radi_add = RADI_ADD;
-    metaobj.refl_mul = REFL_MUL;
-    metaobj.refl_add = REFL_ADD;
-    metaobj.sun_elev = SUN_ELEV;// 기본값
-    
+    if (fname != NULL){
+        metaobj.filename = fname;
+    }
+    else {
+        metaobj.filename = NULL;
+    }
+    if (RADI_MUL != NULL) {
+        metaobj.radi_mul = RADI_MUL;
+    }
+    else {
+        metaobj.radi_mul = NULL;
+    }
+    if (RADI_ADD != NULL) {
+        metaobj.radi_add = RADI_ADD;
+    }
+    else {
+        metaobj.radi_add = NULL;
+    }
+    if (REFL_MUL != NULL) {
+        metaobj.refl_mul = REFL_MUL;
+    }
+    else {
+        metaobj.refl_mul = NULL;
+    }
+    if (REFL_ADD != NULL) {
+        metaobj.refl_add = REFL_ADD;
+    }
+    else {
+        metaobj.refl_add = NULL;
+    }
+    if (SUN_ELEV != NULL) {
+        metaobj.sun_elev = SUN_ELEV;
+    }
+    else {
+        metaobj.sun_elev = NULL;
+    }
+    if (K1_CONSTANT != NULL) {
+        metaobj.k1_constant = K1_CONSTANT;
+    }
+    else {
+        metaobj.k1_constant = NULL;
+    }
+    if (K2_CONSTANT != NULL) {
+        metaobj.k2_constant = K2_CONSTANT;
+    }
+    else {
+        metaobj.k2_constant = NULL;
+    }
     return metaobj;
 }
 
-void geobandWrite(float** band, Geotiff src ,string& fname) {
-
-    char* projection = src.projection;
-    double geotransform[DIMGT];
-    GDALDriverH outHandleDriver;
-    GDALDatasetH outDataset;
-    const char* outname = fname.c_str();
-
-    int nrows, ncols;
-    int row, col;
-    ncols = src.xsize;
-    nrows = src.ysize;
-
-    int count;
-    count = 0;
-    while (count < DIMGT) {
-        geotransform[count] = src.geotransform[count];
-        count++;
-    }
-    outHandleDriver = GDALGetDriverByName("GTiff");
-    outDataset = GDALCreate(outHandleDriver, outname, ncols, nrows, 1, GDT_UInt16, NULL);
-    GDALSetGeoTransform(outDataset, geotransform);
-    GDALSetProjection(outDataset, projection);
-
-    uint16_t* scanLine = (uint16_t*)CPLMalloc(sizeof(uint16_t) * ncols);
-
-    GDALRasterBandH handleRedBand;
-
-    handleRedBand = GDALGetRasterBand(outDataset, 1);
-
-    for (row = 0; row < nrows; row++) {
-        for (col = 0; col < ncols; col++) {
-            scanLine[col] = band[row][col];
-
-        }
-        GDALRasterIO(handleRedBand, GF_Write, 0, row, ncols, 1, scanLine, ncols, 1, GDT_UInt16, 0, 0);
-    }
-    GDALClose(outDataset);
-}
-
-
-int geotiffWrite(uint16_t** bband, uint16_t** gband, uint16_t** rband, uint16_t** nband, Geotiff src, string& fname) {
-
-    char* projection = src.projection;
-    double geotransform[DIMGT];
-    GDALDriverH outHandleDriver;
-    GDALDatasetH outDataset;
-    const char* outname = fname.c_str();
-
-    int nrows, ncols;
-    int row, col;
-    ncols = src.xsize;
-    nrows = src.ysize;
-
-    int count;
-    count = 0;
-    while (count < DIMGT) {
-        geotransform[count] = src.geotransform[count];
-        count++;
-    }
-    outHandleDriver = GDALGetDriverByName("GTiff");
-    outDataset = GDALCreate(outHandleDriver, outname, ncols, nrows, 4, GDT_UInt16, NULL);
-    GDALSetGeoTransform(outDataset, geotransform);
-    GDALSetProjection(outDataset, projection);
-
-    uint16_t* scanLineblue = (uint16_t*)CPLMalloc(sizeof(uint16_t) * ncols);
-    uint16_t* scanLinegreen = (uint16_t*)CPLMalloc(sizeof(uint16_t) * ncols);
-    uint16_t* scanLinered = (uint16_t*)CPLMalloc(sizeof(uint16_t) * ncols);
-    uint16_t* scanLineNIR = (uint16_t*)CPLMalloc(sizeof(uint16_t) * ncols);
-
-    GDALRasterBandH handleRedBand;
-    GDALRasterBandH handleGreenBand;
-    GDALRasterBandH handleBlueBand;
-    GDALRasterBandH handleNIRBand;
-
-    handleRedBand = GDALGetRasterBand(outDataset, 1);
-    handleGreenBand = GDALGetRasterBand(outDataset, 2);
-    handleBlueBand = GDALGetRasterBand(outDataset, 3);
-    handleNIRBand = GDALGetRasterBand(outDataset, 4);
-
-    for (row = 0; row < nrows; row++) {
-        for (col = 0; col < ncols; col++) {
-            scanLinered[col] = rband[row][col];
-            scanLinegreen[col] = gband[row][col];
-            scanLineblue[col] = bband[row][col];
-            scanLineNIR[col] = nband[row][col];
-
-        }
-        GDALRasterIO(handleRedBand, GF_Write, 0, row, ncols, 1, scanLinered, ncols, 1, GDT_UInt16, 0, 0);
-        GDALRasterIO(handleGreenBand, GF_Write, 0, row, ncols, 1, scanLinegreen, ncols, 1, GDT_UInt16, 0, 0);
-        GDALRasterIO(handleBlueBand, GF_Write, 0, row, ncols, 1, scanLineblue, ncols, 1, GDT_UInt16, 0, 0);
-        GDALRasterIO(handleNIRBand, GF_Write, 0, row, ncols, 1, scanLineNIR, ncols, 1, GDT_UInt16, 0, 0);
-    }
-    GDALClose(outDataset);
-    return 0;
-}
 
 int writeGeotiff(
-    Geotiff pan,
-    float** red,
-    float** green,
-    float** blue,
-    float** NIR,
-    string& fname
+    Geotiff bandRef,
+    vector<float**>bands,
+    string& fname,
+    string task
 ) {
 
-    char* projection = pan.projection;
+    char* projection = bandRef.projection;
     double geotransform[DIMGT];
     GDALDriverH outHandleDriver;
     GDALDatasetH outDataset;
     int nrows, ncols;
     int row, col;
-    ncols = pan.xsize;
-    nrows = pan.ysize;
+    ncols = bandRef.xsize;
+    nrows = bandRef.ysize;
     const char* outname = fname.c_str();
 
+    int band_cnt = bands.size();
 
-
-    int count;
-    count = 0;
-    while (count < DIMGT) {
-        geotransform[count] = pan.geotransform[count];
-        count++;
+    int geo_count = 0;
+    while (geo_count < DIMGT) {
+        geotransform[geo_count] = bandRef.geotransform[geo_count];
+        geo_count++;
     }
 
     outHandleDriver = GDALGetDriverByName("GTiff");
     outDataset = GDALCreate(outHandleDriver,
         outname,
-        ncols, nrows, 4,
+        ncols, nrows, band_cnt,
         GDT_Float32, NULL);
     GDALSetGeoTransform(outDataset, geotransform);
     GDALSetProjection(outDataset, projection);
 
 
-    float* scanLineRed = (float*)CPLMalloc(sizeof(float) * ncols);
-    float* scanLineGreen = (float*)CPLMalloc(sizeof(float) * ncols);
-    float* scanLineBlue = (float*)CPLMalloc(sizeof(float) * ncols);
-    float* scanLineNIR = (float*)CPLMalloc(sizeof(float) * ncols);
+    float* scanLinebands[11];
 
-
-    GDALRasterBandH handleRedBand;
-    GDALRasterBandH handleGreenBand;
-    GDALRasterBandH handleBlueBand;
-    GDALRasterBandH handleNIRBand;
-
-    handleRedBand = GDALGetRasterBand(outDataset, 1);
-    handleGreenBand = GDALGetRasterBand(outDataset, 2);
-    handleBlueBand = GDALGetRasterBand(outDataset, 3);
-    handleNIRBand = GDALGetRasterBand(outDataset, 4);
-
-    for (row = 0; row < nrows; row++) {
-
-        for (col = 0; col < ncols; col++) {
-            scanLineRed[col] = red[row][col];
-            scanLineGreen[col] = green[row][col];
-            scanLineBlue[col] = blue[row][col];
-            scanLineNIR[col] = NIR[row][col];
-        }
-
-        GDALRasterIO(
-            handleRedBand, GF_Write, 0, row, ncols, 1,
-            scanLineRed, ncols, 1,
-            GDT_Float32, 0, 0
-        );
-
-        GDALRasterIO(
-            handleGreenBand, GF_Write, 0, row, ncols, 1,
-            scanLineGreen, ncols, 1,
-            GDT_Float32, 0, 0
-        );
-
-        GDALRasterIO(
-            handleBlueBand, GF_Write, 0, row, ncols, 1,
-            scanLineBlue, ncols, 1,
-            GDT_Float32, 0, 0
-        );
-
-        GDALRasterIO(
-            handleNIRBand, GF_Write, 0, row, ncols, 1,
-            scanLineNIR, ncols, 1,
-            GDT_Float32, 0, 0
-        );
-
+    for (int i = 0; i < band_cnt; i++) {
+        scanLinebands[i] = (float*)CPLMalloc(sizeof(float) * ncols);
 
     }
+
+    GDALRasterBandH handleBands[11];
+
+    if (task == "reflectance" || task == "radiance") {
+        for (int i = 0; i < band_cnt; i++) {
+            handleBands[i] = GDALGetRasterBand(outDataset, i + 1);
+        }
+    }
+    else if (task == "thermaltemperature"){
+        for (int i = 0; i < band_cnt; i++) {
+            handleBands[i] = GDALGetRasterBand(outDataset, i + 10);
+        }
+    }
+
+    for (row = 0; row < nrows; row++) {
+        // 각 밴드의 데이터를 하나의 배열에 복사
+        for (int i = 0; i < band_cnt; i++) {
+            for (int col = 0; col < ncols; col++) {
+                scanLinebands[i][col] = bands[i][row][col]; // 각 밴드에서 데이터 복사
+            }
+        }
+
+        // 각 밴드를 한번에 처리
+        for (int i = 0; i < band_cnt; i++) {
+            GDALRasterIO(
+                handleBands[i], GF_Write, 0, row, ncols, 1,
+                scanLinebands[i], ncols, 1,
+                GDT_Float32, 0, 0
+            );
+        }
+    }
+
 
     GDALClose(outDataset);
     return 0;
 }
 
 
-int TOA_reflectance(const char* img_bands[], string& metadata, string& result_path) {
+int cvtToTOAreflectance(const char* img_bands[], string& metadata, string& result_path) {
 
     Geotiff r_band, g_band, b_band, nir_band;
 
@@ -384,10 +354,10 @@ int TOA_reflectance(const char* img_bands[], string& metadata, string& result_pa
     int ncol = b_band.xsize;
     int nrow = b_band.ysize;
 
-    float** b_radi = b_band.band;
-    float** g_radi = g_band.band;
-    float** r_radi = r_band.band;
-    float** nir_radi = nir_band.band;
+    float** b_DN = b_band.band;
+    float** g_DN = g_band.band;
+    float** r_DN = r_band.band;
+    float** nir_DN = nir_band.band;
 
 
     GeotiffMeta b_meta, g_meta, r_meta, n_meta;
@@ -414,11 +384,15 @@ int TOA_reflectance(const char* img_bands[], string& metadata, string& result_pa
         }
     }
 
+
     float** r_TOA_refl = (float**)malloc(nrow * sizeof(float*));
     float** g_TOA_refl = (float**)malloc(nrow * sizeof(float*));
     float** b_TOA_refl = (float**)malloc(nrow * sizeof(float*));
     float** n_TOA_refl = (float**)malloc(nrow * sizeof(float*));
+    float sun_elev;
+    sun_elev = b_meta.sun_elev;
 
+    
     for (int row = 0; row < nrow; row++) {
         r_TOA_refl[row] = (float*)malloc(ncol * sizeof(float));
         g_TOA_refl[row] = (float*)malloc(ncol * sizeof(float));
@@ -426,15 +400,165 @@ int TOA_reflectance(const char* img_bands[], string& metadata, string& result_pa
         n_TOA_refl[row] = (float*)malloc(ncol * sizeof(float));
 
         for (int col = 0; col < ncol; col++) {
-            r_TOA_refl[row][col] = ((r_radi[row][col] * r_meta.refl_mul) + r_meta.refl_add);
-            g_TOA_refl[row][col] = ((g_radi[row][col] * g_meta.refl_mul) + g_meta.refl_add);
-            b_TOA_refl[row][col] = ((b_radi[row][col] * b_meta.refl_mul) + b_meta.refl_add);
-            n_TOA_refl[row][col] = ((nir_radi[row][col] * n_meta.refl_mul) + n_meta.refl_add);
+            r_TOA_refl[row][col] = ((r_DN[row][col] * r_meta.refl_mul) + r_meta.refl_add) / sin(sun_elev);
+            g_TOA_refl[row][col] = ((g_DN[row][col] * g_meta.refl_mul) + g_meta.refl_add) / sin(sun_elev);
+            b_TOA_refl[row][col] = ((b_DN[row][col] * b_meta.refl_mul) + b_meta.refl_add) / sin(sun_elev);
+            n_TOA_refl[row][col] = ((nir_DN[row][col] * n_meta.refl_mul) + n_meta.refl_add) / sin(sun_elev);
 
 
         }
     }
-    writeGeotiff(b_band, r_TOA_refl, g_TOA_refl, b_TOA_refl, n_TOA_refl, result_path);
+    vector<float**> outputbands;
+    outputbands.push_back(r_TOA_refl);
+    outputbands.push_back(g_TOA_refl);
+    outputbands.push_back(b_TOA_refl);
+    outputbands.push_back(n_TOA_refl);
+
+    vector<string> tasks;
+    tasks.push_back("radiance");
+    tasks.push_back("reflectance");
+    tasks.push_back("BT");
+
+    writeGeotiff(b_band, outputbands, result_path,tasks[1]);
+    return 0;
+
+}
+
+int cvtToRadiance(const char* img_bands[], string& metadata, string& result_path) {
+
+    Geotiff r_band, g_band, b_band, nir_band;
+
+    b_band = readGeotiff(img_bands[0]);
+    g_band = readGeotiff(img_bands[1]);
+    r_band = readGeotiff(img_bands[2]);
+    nir_band = readGeotiff(img_bands[3]);
+
+    int ncol = b_band.xsize;
+    int nrow = b_band.ysize;
+
+    float** b_DN = b_band.band;
+    float** g_DN = g_band.band;
+    float** r_DN = r_band.band;
+    float** nir_DN = nir_band.band;
+
+
+    GeotiffMeta b_meta, g_meta, r_meta, n_meta;
+    for (int i = 0; i < 4; i++) {
+        if (i == 0) {
+
+            b_meta = readGeoTiffMeta(metadata, i + 2);
+
+        }
+        else if (i == 1) {
+
+            g_meta = readGeoTiffMeta(metadata, i + 2);
+
+        }
+        else if (i == 2) {
+
+            r_meta = readGeoTiffMeta(metadata, i + 2);
+
+        }
+        else if (i == 3) {
+
+            n_meta = readGeoTiffMeta(metadata, i + 2);
+
+        }
+    }
+
+    float** r_radi = (float**)malloc(nrow * sizeof(float*));
+    float** g_radi = (float**)malloc(nrow * sizeof(float*));
+    float** b_radi = (float**)malloc(nrow * sizeof(float*));
+    float** n_radi = (float**)malloc(nrow * sizeof(float*));
+    float sun_elev;
+    sun_elev = b_meta.sun_elev;
+
+
+    for (int row = 0; row < nrow; row++) {
+        r_radi[row] = (float*)malloc(ncol * sizeof(float));
+        g_radi[row] = (float*)malloc(ncol * sizeof(float));
+        b_radi[row] = (float*)malloc(ncol * sizeof(float));
+        n_radi[row] = (float*)malloc(ncol * sizeof(float));
+
+        for (int col = 0; col < ncol; col++) {
+            r_radi[row][col] = ((r_DN[row][col] * r_meta.radi_mul) + r_meta.radi_add);
+            g_radi[row][col] = ((g_DN[row][col] * g_meta.radi_mul) + g_meta.radi_add);
+            b_radi[row][col] = ((b_DN[row][col] * b_meta.radi_mul) + b_meta.radi_add);
+            n_radi[row][col] = ((nir_DN[row][col] * n_meta.radi_mul) + n_meta.radi_add);
+
+
+        }
+    }
+    vector<float**> outputbands;
+    outputbands.push_back(r_radi);
+    outputbands.push_back(g_radi);
+    outputbands.push_back(b_radi);
+    outputbands.push_back(n_radi);
+
+    vector<string> tasks;
+    tasks.push_back("radiance");
+    tasks.push_back("reflectance");
+    tasks.push_back("BT");
+
+    writeGeotiff(b_band, outputbands, result_path,tasks[0]);
+    return 0;
+
+}
+
+int cvtToTOABT(const char* img_bands[], string& metadata, string& result_path) {
+
+    Geotiff b10_band, b11_band;
+
+    b10_band = readGeotiff(img_bands[0]);
+    b11_band = readGeotiff(img_bands[1]);
+    
+    int ncol = b11_band.xsize;
+    int nrow = b11_band.ysize;
+
+    float** b10_DN = b10_band.band;
+    float** b11_DN = b11_band.band;
+    
+
+    GeotiffMeta b10_meta, b11_meta;
+    for (int i = 0; i < 4; i++) {
+        if (i == 0) {
+
+            b10_meta = readGeoTiffMeta(metadata, 10);
+
+        }
+        else if (i == 1) {
+
+            b11_meta = readGeoTiffMeta(metadata, 11);
+
+        }
+    }
+
+
+    float** b10_thermal = (float**)malloc(nrow * sizeof(float*));
+    float** b11_thermal = (float**)malloc(nrow * sizeof(float*));
+
+
+    for (int row = 0; row < nrow; row++) {
+        b10_thermal[row] = (float*)malloc(ncol * sizeof(float));
+        b11_thermal[row] = (float*)malloc(ncol * sizeof(float));
+       
+        for (int col = 0; col < ncol; col++) {
+            b10_thermal[row][col] = b10_meta.k2_constant/(log((b10_meta.k1_constant/((b10_DN[row][col] * b10_meta.radi_mul) + b10_meta.radi_add))+1));
+            b11_thermal[row][col] = b11_meta.k2_constant / (log((b11_meta.k1_constant / ((b11_DN[row][col] * b11_meta.radi_mul) + b11_meta.radi_add)) + 1));
+
+        }
+    }
+
+    vector<float**> outputbands;
+    outputbands.push_back(b10_thermal);
+    outputbands.push_back(b11_thermal);
+
+    vector<string> tasks;
+    tasks.push_back("radiance");
+    tasks.push_back("reflectance");
+    tasks.push_back("BT");
+
+    writeGeotiff(b10_band,outputbands,result_path,tasks[2]);
     return 0;
 
 }
