@@ -35,17 +35,21 @@ void readProjectionGeotiff(GDALDatasetH, Geotiff*);
 void readDimensionsGeotiff(const char*, GDALDatasetH, Geotiff*);
 void readBandGeotiff(const char*, GDALDatasetH, Geotiff*, int);
 GeotiffMeta readGeoTiffMeta(string&, int);
-void geobandWrite(uint16_t**, Geotiff, string&);
-int geotiffWrite(uint16_t**, uint16_t**, uint16_t**, uint16_t**, Geotiff, string&);
 
 int writeGeotiff(
 	Geotiff,
 	vector<float**>,
-	string&,
-	string task);
+	string&
+);
 
-int cvtToTOAreflectance(const char*[], string&, string&);
-int cvtToRadiance(const char* [], string&, string&);
+int writeGeoband(
+	Geotiff,
+	float**,
+	string&
+);
+
+int cvtToTOAreflectance(const char*, string&, string&);
+int cvtToRadiance(const char* , string&, string&);
 int cvtToTOABT(const char* [], string&, string&);
 
 #endif

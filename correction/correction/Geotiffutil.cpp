@@ -8,6 +8,7 @@
 #include <iostream>
 #include <cmath>
 #include <vector>
+#include <regex>
 
 using namespace std;
 
@@ -26,6 +27,8 @@ Geotiff readGeotiff(const char* fname) {
     readDimensionsGeotiff(fname, geotiffReader, &GeotiffObj);
     readProjectionGeotiff(geotiffReader, &GeotiffObj);
     readBandGeotiff(fname, geotiffReader, &GeotiffObj, 1);
+
+
     return GeotiffObj;
 
 }
@@ -267,8 +270,7 @@ GeotiffMeta readGeoTiffMeta(string& filename, int band) {
 int writeGeotiff(
     Geotiff bandRef,
     vector<float**>bands,
-    string& fname,
-    string task
+    string& fname
 ) {
 
     char* projection = bandRef.projection;
@@ -307,15 +309,12 @@ int writeGeotiff(
 
     GDALRasterBandH handleBands[11];
 
-    if (task == "reflectance" || task == "radiance") {
-        for (int i = 0; i < band_cnt; i++) {
-            handleBands[i] = GDALGetRasterBand(outDataset, i + 1);
-        }
+
+    for (int i = 0; i < band_cnt; i++) {
+        handleBands[i] = GDALGetRasterBand(outDataset, i + 1);
     }
-    else if (task == "thermaltemperature"){
-        for (int i = 0; i < band_cnt; i++) {
-            handleBands[i] = GDALGetRasterBand(outDataset, i + 10);
-        }
+    for (int i = 0; i < band_cnt; i++) {
+        handleBands[i] = GDALGetRasterBand(outDataset, i + 10);
     }
 
     for (row = 0; row < nrows; row++) {
@@ -341,166 +340,150 @@ int writeGeotiff(
     return 0;
 }
 
+int writeGeoband(
+    Geotiff bandRef,
+    float** band,
+    string& fname
+    ) {
 
-int cvtToTOAreflectance(const char* img_bands[], string& metadata, string& result_path) {
+    char* projection = bandRef.projection;
+    double geotransform[DIMGT];
+    GDALDriverH outHandleDriver;
+    GDALDatasetH outDataset;
+    int nrows, ncols;
+    int row, col;
+    ncols = bandRef.xsize;
+    nrows = bandRef.ysize;
+    const char* outname = fname.c_str();
 
-    Geotiff r_band, g_band, b_band, nir_band;
+    int band_cnt = 1;
 
-    b_band = readGeotiff(img_bands[0]);
-    g_band = readGeotiff(img_bands[1]);
-    r_band = readGeotiff(img_bands[2]);
-    nir_band = readGeotiff(img_bands[3]);
+    int geo_count = 0;
+    while (geo_count < DIMGT) {
+        geotransform[geo_count] = bandRef.geotransform[geo_count];
+        geo_count++;
+    }
 
-    int ncol = b_band.xsize;
-    int nrow = b_band.ysize;
+    outHandleDriver = GDALGetDriverByName("GTiff");
+    outDataset = GDALCreate(outHandleDriver,
+        outname,
+        ncols, nrows, band_cnt,
+        GDT_Float32, NULL);
+    GDALSetGeoTransform(outDataset, geotransform);
+    GDALSetProjection(outDataset, projection);
 
-    float** b_DN = b_band.band;
-    float** g_DN = g_band.band;
-    float** r_DN = r_band.band;
-    float** nir_DN = nir_band.band;
+
+    float* scanLineband;
+    scanLineband = (float*)CPLMalloc(sizeof(float) * ncols);
 
 
-    GeotiffMeta b_meta, g_meta, r_meta, n_meta;
-    for (int i = 0; i < 4; i++) {
-        if (i == 0) {
 
-            b_meta = readGeoTiffMeta(metadata, i + 2);
+    GDALRasterBandH handleBands;
+    handleBands = GDALGetRasterBand(outDataset, 1);
 
+
+    for (row = 0; row < nrows; row++) {
+        // 각 밴드의 데이터를 하나의 배열에 복사
+        for (int col = 0; col < ncols; col++) {
+            scanLineband[col] = band[row][col]; // 각 밴드에서 데이터 복사
         }
-        else if (i == 1) {
+        GDALRasterIO(handleBands, GF_Write, 0, row, ncols, 1, scanLineband, ncols, 1, GDT_Float32, 0, 0);
+    }
 
-            g_meta = readGeoTiffMeta(metadata, i + 2);
+    GDALClose(outDataset);
+    return 0;
+}
 
-        }
-        else if (i == 2) {
 
-            r_meta = readGeoTiffMeta(metadata, i + 2);
+int cvtToTOAreflectance(const char* img_band, string& metadata, string& result_path) {
 
-        }
-        else if (i == 3) {
+    Geotiff band;
+    band = readGeotiff(img_band);
 
-            n_meta = readGeoTiffMeta(metadata, i + 2);
 
-        }
+    int ncol = band.xsize;
+    int nrow = band.ysize;
+
+    float** DN = band.band;
+
+    string fname = string(img_band);
+
+    regex pattern("B(\\d+)");
+    smatch match;
+    int band_num;
+
+    if (regex_search(fname, match, pattern)) {
+        band_num = stoi(match[1]);
+    }
+    else {
+        cout << "Band number not found" << endl;
     }
 
 
-    float** r_TOA_refl = (float**)malloc(nrow * sizeof(float*));
-    float** g_TOA_refl = (float**)malloc(nrow * sizeof(float*));
-    float** b_TOA_refl = (float**)malloc(nrow * sizeof(float*));
-    float** n_TOA_refl = (float**)malloc(nrow * sizeof(float*));
+    GeotiffMeta meta;
+    meta = readGeoTiffMeta(metadata, band_num);
+
+
+    float** TOA_refl = (float**)malloc(nrow * sizeof(float*));
     float sun_elev;
-    sun_elev = b_meta.sun_elev;
+    sun_elev = meta.sun_elev;
 
     
     for (int row = 0; row < nrow; row++) {
-        r_TOA_refl[row] = (float*)malloc(ncol * sizeof(float));
-        g_TOA_refl[row] = (float*)malloc(ncol * sizeof(float));
-        b_TOA_refl[row] = (float*)malloc(ncol * sizeof(float));
-        n_TOA_refl[row] = (float*)malloc(ncol * sizeof(float));
+        TOA_refl[row] = (float*)malloc(ncol * sizeof(float));
 
         for (int col = 0; col < ncol; col++) {
-            r_TOA_refl[row][col] = ((r_DN[row][col] * r_meta.refl_mul) + r_meta.refl_add) / sin(sun_elev);
-            g_TOA_refl[row][col] = ((g_DN[row][col] * g_meta.refl_mul) + g_meta.refl_add) / sin(sun_elev);
-            b_TOA_refl[row][col] = ((b_DN[row][col] * b_meta.refl_mul) + b_meta.refl_add) / sin(sun_elev);
-            n_TOA_refl[row][col] = ((nir_DN[row][col] * n_meta.refl_mul) + n_meta.refl_add) / sin(sun_elev);
-
+            TOA_refl[row][col] = ((DN[row][col] * meta.refl_mul) + meta.refl_add) / sin(sun_elev);
 
         }
     }
-    vector<float**> outputbands;
-    outputbands.push_back(r_TOA_refl);
-    outputbands.push_back(g_TOA_refl);
-    outputbands.push_back(b_TOA_refl);
-    outputbands.push_back(n_TOA_refl);
 
-    vector<string> tasks;
-    tasks.push_back("radiance");
-    tasks.push_back("reflectance");
-    tasks.push_back("BT");
 
-    writeGeotiff(b_band, outputbands, result_path,tasks[1]);
+    writeGeoband(band, TOA_refl, result_path);
     return 0;
 
 }
 
-int cvtToRadiance(const char* img_bands[], string& metadata, string& result_path) {
+int cvtToRadiance(const char* img_band, string& metadata, string& result_path) {
 
-    Geotiff r_band, g_band, b_band, nir_band;
+    Geotiff band;
+    band = readGeotiff(img_band);
+    int ncol = band.xsize;
+    int nrow = band.ysize;
 
-    b_band = readGeotiff(img_bands[0]);
-    g_band = readGeotiff(img_bands[1]);
-    r_band = readGeotiff(img_bands[2]);
-    nir_band = readGeotiff(img_bands[3]);
-
-    int ncol = b_band.xsize;
-    int nrow = b_band.ysize;
-
-    float** b_DN = b_band.band;
-    float** g_DN = g_band.band;
-    float** r_DN = r_band.band;
-    float** nir_DN = nir_band.band;
+    float** DN = band.band;
 
 
-    GeotiffMeta b_meta, g_meta, r_meta, n_meta;
-    for (int i = 0; i < 4; i++) {
-        if (i == 0) {
+    string fname = string(img_band);
 
-            b_meta = readGeoTiffMeta(metadata, i + 2);
+    regex pattern("B(\\d+)");
+    smatch match;
+    int band_num;
 
-        }
-        else if (i == 1) {
-
-            g_meta = readGeoTiffMeta(metadata, i + 2);
-
-        }
-        else if (i == 2) {
-
-            r_meta = readGeoTiffMeta(metadata, i + 2);
-
-        }
-        else if (i == 3) {
-
-            n_meta = readGeoTiffMeta(metadata, i + 2);
-
-        }
+    if (regex_search(fname, match, pattern)) {
+        band_num = stoi(match[1]);
+    }
+    else {
+        cout << "Band number not found" << endl;
     }
 
-    float** r_radi = (float**)malloc(nrow * sizeof(float*));
-    float** g_radi = (float**)malloc(nrow * sizeof(float*));
-    float** b_radi = (float**)malloc(nrow * sizeof(float*));
-    float** n_radi = (float**)malloc(nrow * sizeof(float*));
+    GeotiffMeta meta;
+    meta = readGeoTiffMeta(metadata, band_num);
+
+
+    float** radi = (float**)malloc(nrow * sizeof(float*));
     float sun_elev;
-    sun_elev = b_meta.sun_elev;
+    sun_elev = meta.sun_elev;
 
 
     for (int row = 0; row < nrow; row++) {
-        r_radi[row] = (float*)malloc(ncol * sizeof(float));
-        g_radi[row] = (float*)malloc(ncol * sizeof(float));
-        b_radi[row] = (float*)malloc(ncol * sizeof(float));
-        n_radi[row] = (float*)malloc(ncol * sizeof(float));
-
+        radi[row] = (float*)malloc(ncol * sizeof(float));
         for (int col = 0; col < ncol; col++) {
-            r_radi[row][col] = ((r_DN[row][col] * r_meta.radi_mul) + r_meta.radi_add);
-            g_radi[row][col] = ((g_DN[row][col] * g_meta.radi_mul) + g_meta.radi_add);
-            b_radi[row][col] = ((b_DN[row][col] * b_meta.radi_mul) + b_meta.radi_add);
-            n_radi[row][col] = ((nir_DN[row][col] * n_meta.radi_mul) + n_meta.radi_add);
-
-
+            radi[row][col] = ((DN[row][col] * meta.radi_mul) + meta.radi_add);
         }
-    }
-    vector<float**> outputbands;
-    outputbands.push_back(r_radi);
-    outputbands.push_back(g_radi);
-    outputbands.push_back(b_radi);
-    outputbands.push_back(n_radi);
+    };
 
-    vector<string> tasks;
-    tasks.push_back("radiance");
-    tasks.push_back("reflectance");
-    tasks.push_back("BT");
-
-    writeGeotiff(b_band, outputbands, result_path,tasks[0]);
+    writeGeoband(band, radi, result_path);
     return 0;
 
 }
@@ -558,7 +541,7 @@ int cvtToTOABT(const char* img_bands[], string& metadata, string& result_path) {
     tasks.push_back("reflectance");
     tasks.push_back("BT");
 
-    writeGeotiff(b10_band,outputbands,result_path,tasks[2]);
+    writeGeotiff(b10_band,outputbands,result_path);
     return 0;
 
 }
